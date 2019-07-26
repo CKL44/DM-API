@@ -1,0 +1,611 @@
+
+
+//Usage 
+ List<string> form = DMFormItem.GetProfileEditFields("Lawprof", dst, lib);
+
+
+
+using Hummingbird.DM.Server.Interop.PCDClient;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace DMFormParser
+{
+
+    [Flags]
+    public enum FormFlags : ulong
+    {
+        Caption = 0x00000001,
+        Resize = 0x00000002,
+        Close = 0x00000004,
+        Minimize = 0x00000008,
+        Child = 0x00000010,
+        Gradient = 0x00000020,
+        VScroll = 0x00000040,
+        HScroll = 0x00000080,
+        TabDown = 0x00000100,
+        SystemKey = 0x00000200,
+        StartMin = 0x00000400,
+        DialogBorder = 0x00000800,
+        Maintenance = 0x00001000,
+        DOSMode = 0x00002000,
+        Normal = 0
+    }
+
+    [Flags]
+    public enum FieldFlags : ulong
+    {
+        Dummy1 = 0x00000001,
+        HasTableLookup = 0x00000002,
+        HasPrompt = 0x00000004,
+        AllUpper = 0x00000008,
+        AllLower = 0x00000010,
+        Password = 0x00000020,
+        Required = 0x00000040,
+        MultiLine = 0x00000080,
+        VScroll = 0x00000100,
+        HScroll = 0x00000200,
+        WordWrap = 0x00000400,
+        AllowTabs = 0x00000800,
+        LongData = 0x00001000,
+        Grayed = 0x00002000,
+        Locked = 0x00004000,
+        Transparent = 0x00008000,
+        Dummy6 = 0x00010000,
+        Dummy7 = 0x00020000,
+        Dummy8 = 0x00040000,
+        ReadOnly = 0x00080000,
+        ComboBox = 0x00100000,
+        KeyWord = 0x00200000,
+        NamedObj = 0x00400000,
+        ExObj = 0x00800000,
+        Hidden = 0x01000000,
+        Disabled = 0x02000000,
+        Protected = 0x04000000,
+        SaveBits = 0x08000000,
+        Dragable = 0x10000000,
+        Searchable = 0x20000000,
+        ScreenPainter = 0x40000000,
+    }
+
+    [Flags]
+    public enum LookupColumnFlags : ulong
+    {
+        Wrap = 0x0004,
+        Hidden = 0x0020,
+    }
+
+
+    class DMFormItem
+    {
+        public string ItemType { get; set; }            //Form, textbox, checkbox, button, combobox...
+        public int ItemXPos { get; set; }               //Starting X point.
+        public int ItemYPos { get; set; }               //Starting Y point.
+        public int ItemWidth { get; set; }              //Width of the item.
+        public int ItemHeight { get; set; }             //Height of the item.
+        public FormFlags FormFlags { get; set; }        //Flags that determine state of the form.  See ObjectFlags.cs
+        public FieldFlags FieldFlags { get; set; }      //Flags that determine state of a field.  See ObjectFlags.cs
+        public string ItemName { get; set; }            //The Name property of an object.
+        public string ItemPrompt { get; set; }          //The text of the prompt converted to a label for most objects.
+        public int ItemPromptWidth { get; set; }        //The width of the prompt.
+        public string ItemPromptLocation { get; set; }  //Prompt location, right, left, above.
+        public string ItemPromptAlignment { get; set; } //Text justification of the prompt label.
+        public string ItemLookUp { get; set; }          //The name of the lookup used for the object.
+        public string RadioButtons { get; set; }        //If the item is a radio group, this property stores the buttons.
+        public string ComboBoxItems { get; set; }       //If the item is a combobox, this property contains the drop down values and display items.
+        public string ItemFormat { get; set; }          //Format string used for displaying database values as meaningful text.
+        public string DefaultValue { get; set; }        //For radio groups, this is the default button selected.
+        public string SqlInfo { get; set; }             //Contains the ProfileColumn or ProfileColumn.LinkedCandidateKeyColumn;LinkedTableOwner.LinkedTable.LinkedTablePrimaryKey
+        public bool MultiValue { get; set; }            //True if item is a multivalue field.
+        public string ChkOnValue { get; set; }          //Value of checkbox when checked.
+        public string ChkOffValue { get; set; }         //Value of checkbox when not checked.
+        public string ItemFont { get; set; }
+        public int ItemBorder { get; set; }
+        public int HelpId { get; set; }
+        public string ForeColorName { get; set; }
+        public string BackColor { get; set; }
+        public string BackColorName { get; set; }
+        public int MaxChars { get; set; }
+        public int EditBorder { get; set; }
+        public string EditFont { get; set; }
+        public string EForeColorName { get; set; }
+        public string EBackColorName { get; set; }
+        public string LInfo { get; set; }
+        public string LFont { get; set; }
+        public string LBorder { get; set; }
+        public string Column0 { get; set; }
+        public string GradientName { get; set; }
+        public string ItemTable { get; set; }
+
+
+
+        public static List<string> GetProfileEditFields(string form, string dst, string library)
+        {
+            List<string> fields = new List<string>();
+            fields.Add("");
+            List<DMFormItem> profileItems = GetFormDefinition(form, dst, library);
+            foreach (DMFormItem pItem in profileItems)
+            {
+                if (pItem.ItemType == "[CMSEdit]")
+                {
+                    if (!((pItem.FieldFlags & FieldFlags.Hidden) == FieldFlags.Hidden) && !((pItem.FieldFlags & FieldFlags.Locked) == FieldFlags.Locked))
+                    {
+                        fields.Add(pItem.ItemName);
+                    }
+
+                }
+            }
+
+
+            return fields;
+
+
+        }
+
+
+
+        public static List<DMFormItem> GetFormDefinition(string form, string dst, string library)
+        {
+            PCDGetForm dmForm = new PCDGetForm();
+            dmForm.SetDST(dst);
+            dmForm.AddSearchLib(library);
+            dmForm.SetObjectType(form);
+            dmForm.Execute();
+
+            string[] lineFeedDelimiters = new string[]
+            {
+                "\r\n",     // this covers the CTRL-R/CTRL-N
+                "\n",       // this covers the CTRL-N
+                "\\r\\n",   // this covers the characters \r\n
+                "\\n"       // this covers characters \n
+            };
+
+            string formDef = dmForm.GetPropertyValue("%CONTENT");
+            string[] formItems = formDef.ToString().Split(lineFeedDelimiters, StringSplitOptions.None);
+            DMFormItem myFormItem = new DMFormItem();
+            List<DMFormItem> myFormItems = new List<DMFormItem>();
+            for (int i = 0; i < formItems.Length; ++i)
+            {
+                if (formItems[i] != "")
+                {
+                    string[] formItemParts = formItems[i].Split('=');
+                    if (formItemParts[0].Substring(0, 1) == "[")
+                    {
+                        if (i > 0)
+                        {
+                            myFormItems.Add(myFormItem);
+                            myFormItem = new DMFormItem();
+                        }
+                        myFormItem.ItemType = formItems[i];
+                    }
+
+                    switch (formItemParts[0])
+                    {
+                        case "Info":
+                            string[] infoValues = formItemParts[1].Split(',');
+                            myFormItem.ItemXPos = int.Parse(infoValues[0]);
+                            myFormItem.ItemYPos = int.Parse(infoValues[1]);
+                            myFormItem.ItemWidth = int.Parse(infoValues[2]);
+                            myFormItem.ItemHeight = int.Parse(infoValues[3]);
+                            if (myFormItem.ItemType == "[CMSForm]")
+                            {
+                                myFormItem.FormFlags = ConvertFlags.ConvertToFormFlags(infoValues[4]);
+                            }
+                            else
+                            {
+                                myFormItem.FieldFlags = ConvertFlags.ConvertToFieldFlags(infoValues[4]);
+                            }
+                            break;
+                        case "Name":
+                            myFormItem.ItemName = formItemParts[1];
+                            if (myFormItem.ItemType == "[CMSForm]")
+                            {
+                                if (myFormItem.ItemName != form)
+                                {
+                                    myFormItem.ItemName = form;
+                                }
+                            }
+                            break;
+                        case "SQLInfo":
+                            myFormItem.SqlInfo = formItemParts[1];
+                            break;
+                        case "Prompt":
+                            myFormItem.ItemPrompt = formItemParts[1];
+                            //why were you setting prompt width to 107?
+                            //myFormItem.itemPromptWidth = 107;
+                            break;
+                        case "PromptWidth":
+                            myFormItem.ItemPromptWidth = int.Parse(formItemParts[1]);
+                            break;
+                        case "PLocation":
+                            switch (int.Parse(formItemParts[1]))
+                            {
+                                case 0:
+                                    myFormItem.ItemPromptLocation = "None";
+                                    break;
+                                case 1:
+                                    myFormItem.ItemPromptLocation = "Above";
+                                    break;
+                                default:
+                                    myFormItem.ItemPromptLocation = "Left";
+                                    break;
+                            }
+                            break;
+                        case "PAlignment":
+                            switch (int.Parse(formItemParts[1]))
+                            {
+                                case 1:
+                                    myFormItem.ItemPromptAlignment = "Center";
+                                    break;
+                                case 2:
+                                    myFormItem.ItemPromptAlignment = "Right";
+                                    break;
+                                default:
+                                    myFormItem.ItemPromptAlignment = "Left";
+                                    break;
+                            }
+                            break;
+                        case "Lookup":
+                            myFormItem.ItemLookUp = formItemParts[1];
+                            break;
+                        case "Value":
+                            myFormItem.DefaultValue = formItemParts[1];
+                            break;
+                        case "Buttons":
+                            myFormItem.RadioButtons = formItemParts[1];
+                            int j = ++i;
+                            while (!formItems[j].Contains('='))
+                            {
+                                if (!String.IsNullOrEmpty(formItems[j]))
+                                {
+                                    myFormItem.RadioButtons = myFormItem.RadioButtons + "\r\n" + formItems[j];
+                                }
+                                ++j;
+                            }
+                            break;
+                        case "Format":
+                            myFormItem.ItemFormat = formItemParts[1];
+                            for (int k = 2; k < formItemParts.Length; ++k)
+                            {
+                                myFormItem.ItemFormat = myFormItem.ItemFormat + formItemParts[k];
+                            }
+                            break;
+                        case "Row0":
+                            myFormItem.ComboBoxItems = formItemParts[1];
+                            int m = ++i;
+                            if (formItems[m] != "")
+                            {
+                                while (formItems[m].Substring(0, 3) == "Row")
+                                {
+                                    string[] comboValues = formItems[m].Split('=');
+                                    myFormItem.ComboBoxItems = myFormItem.ComboBoxItems + "\r\n" + comboValues[1];
+                                    ++m;
+                                    if (String.IsNullOrEmpty(formItems[m]))
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                        case "MVInfo":
+                            myFormItem.SqlInfo = myFormItem.SqlInfo + ";" + formItemParts[1];
+                            myFormItem.MultiValue = true;
+                            break;
+                        case "CheckedTrigger":
+                            myFormItem.ChkOnValue = formItemParts[1];
+                            break;
+                        case "UncheckedTrigger":
+                            myFormItem.ChkOffValue = formItemParts[1];
+                            break;
+                        case "Font":
+                            break;
+                        case "Border":
+                            break;
+                        case "HelpID":
+                            break;
+                        case "ForeColorName":
+                            break;
+                        case "BackColorName":
+                            break;
+                        case "ForeColor":
+                            break;
+                        case "BackColor":
+                            break;
+                        case "MaxChars": //Version 1.0.4 - Added support for max characters.
+                            int maxChars = 0;
+                            bool rc = int.TryParse(formItemParts[1], out maxChars);
+                            if (rc)
+                            {
+                                myFormItem.MaxChars = int.Parse(formItemParts[1]);
+                            }
+                            break;
+                        case "EditBorder":
+                            break;
+                        case "EditFont":
+                            break;
+                        case "EForeColorName":
+                            break;
+                        case "EBackColorName":
+                            break;
+                        case "LInfo":
+                            break;
+                        case "LFont":
+                            break;
+                        case "LBorder":
+                            break;
+                        case "Column0":
+                            break;
+                    }
+                }
+                else
+                {
+                    myFormItems.Add(myFormItem);
+                    myFormItem = new DMFormItem();
+                }
+            }
+
+            string onValue = "";
+            string offValue = "";
+            PCDSQL dmSQL = new PCDSQL();
+            dmSQL.SetDST(dst);
+            dmSQL.SetLibrary(library);
+
+            foreach (DMFormItem formItem in myFormItems)
+            {
+                if (formItem.ItemType == "[CMSCheckBox]")
+                {
+                    if (formItem.ChkOnValue == null)
+                    {
+                        string strSQL = "SELECT CMSTYPE, FORMAT FROM DOCSADM.DOCSCOLUMN WHERE TBNAME='PROFILE' AND COLNAME='" + formItem.SqlInfo + "'";
+                        dmSQL.Execute(strSQL);
+                        if (dmSQL.GetRowCount() > 0)
+                        {
+                            if (dmSQL.GetColumnValue(2).ToString() != "")
+                            {
+                                string[] chkBoxValues = dmSQL.GetColumnValue(2).ToString().Split('|');
+                                if (chkBoxValues.Length > 1)
+                                {
+                                    onValue = chkBoxValues[0];
+                                    offValue = chkBoxValues[1];
+                                }
+                            }
+                            else if (dmSQL.GetColumnValue(1) == "0")
+                            {
+                                onValue = "Y";
+                                offValue = "N";
+                            }
+                            else
+                            {
+                                onValue = "1";
+                                offValue = "0";
+                            }
+                        }
+                        formItem.ChkOnValue = onValue;
+                        formItem.ChkOffValue = offValue;
+                    }
+                }
+            }
+
+            return myFormItems;
+
+
+
+
+        }
+
+
+    }
+
+    public static class ConvertFlags
+    {
+
+        public static FormFlags ConvertToFormFlags(string infoValue)
+        {
+            FormFlags myFlags = new FormFlags();
+
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Caption) == (int)FormFlags.Caption)
+            {
+                myFlags = myFlags | FormFlags.Caption;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Resize) == (int)FormFlags.Resize)
+            {
+                myFlags = myFlags | FormFlags.Resize;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Close) == (int)FormFlags.Close)
+            {
+                myFlags = myFlags | FormFlags.Close;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Minimize) == (int)FormFlags.Minimize)
+            {
+                myFlags = myFlags | FormFlags.Minimize;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Child) == (int)FormFlags.Child)
+            {
+                myFlags = myFlags | FormFlags.Child;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Gradient) == (int)FormFlags.Gradient)
+            {
+                myFlags = myFlags | FormFlags.Gradient;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.VScroll) == (int)FormFlags.VScroll)
+            {
+                myFlags = myFlags | FormFlags.VScroll;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.HScroll) == (int)FormFlags.HScroll)
+            {
+                myFlags = myFlags | FormFlags.HScroll;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.TabDown) == (int)FormFlags.TabDown)
+            {
+                myFlags = myFlags | FormFlags.TabDown;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.SystemKey) == (int)FormFlags.SystemKey)
+            {
+                myFlags = myFlags | FormFlags.SystemKey;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.StartMin) == (int)FormFlags.StartMin)
+            {
+                myFlags = myFlags | FormFlags.StartMin;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.DialogBorder) == (int)FormFlags.DialogBorder)
+            {
+                myFlags = myFlags | FormFlags.DialogBorder;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Maintenance) == (int)FormFlags.Maintenance)
+            {
+                myFlags = myFlags | FormFlags.Maintenance;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.DOSMode) == (int)FormFlags.DOSMode)
+            {
+                myFlags = myFlags | FormFlags.DOSMode;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FormFlags.Normal) == (int)FormFlags.Normal)
+            {
+                myFlags = myFlags | FormFlags.Normal;
+            }
+
+            return myFlags;
+        }
+
+
+        public static FieldFlags ConvertToFieldFlags(string infoValue)
+        {
+            FieldFlags myFlags = new FieldFlags();
+
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Dummy1) == (int)FieldFlags.Dummy1)
+            {
+                myFlags = myFlags | FieldFlags.Dummy1;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.HasTableLookup) == (int)FieldFlags.HasTableLookup)
+            {
+                myFlags = myFlags | FieldFlags.HasTableLookup;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.HasPrompt) == (int)FieldFlags.HasPrompt)
+            {
+                myFlags = myFlags | FieldFlags.HasPrompt;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.AllUpper) == (int)FieldFlags.AllUpper)
+            {
+                myFlags = myFlags | FieldFlags.AllUpper;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.AllLower) == (int)FieldFlags.AllLower)
+            {
+                myFlags = myFlags | FieldFlags.AllLower;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Password) == (int)FieldFlags.Password)
+            {
+                myFlags = myFlags | FieldFlags.Password;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Required) == (int)FieldFlags.Required)
+            {
+                myFlags = myFlags | FieldFlags.Required;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.MultiLine) == (int)FieldFlags.MultiLine)
+            {
+                myFlags = myFlags | FieldFlags.MultiLine;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.VScroll) == (int)FieldFlags.VScroll)
+            {
+                myFlags = myFlags | FieldFlags.VScroll;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.HScroll) == (int)FieldFlags.HScroll)
+            {
+                myFlags = myFlags | FieldFlags.HScroll;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.WordWrap) == (int)FieldFlags.WordWrap)
+            {
+                myFlags = myFlags | FieldFlags.WordWrap;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.AllowTabs) == (int)FieldFlags.AllowTabs)
+            {
+                myFlags = myFlags | FieldFlags.AllowTabs;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.LongData) == (int)FieldFlags.LongData)
+            {
+                myFlags = myFlags | FieldFlags.LongData;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Grayed) == (int)FieldFlags.Grayed)
+            {
+                myFlags = myFlags | FieldFlags.Grayed;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Locked) == (int)FieldFlags.Locked)
+            {
+                myFlags = myFlags | FieldFlags.Locked;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Transparent) == (int)FieldFlags.Transparent)
+            {
+                myFlags = myFlags | FieldFlags.Transparent;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Dummy6) == (int)FieldFlags.Dummy6)
+            {
+                myFlags = myFlags | FieldFlags.Dummy6;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Dummy7) == (int)FieldFlags.Dummy7)
+            {
+                myFlags = myFlags | FieldFlags.Dummy7;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Dummy8) == (int)FieldFlags.Dummy8)
+            {
+                myFlags = myFlags | FieldFlags.Dummy8;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.ReadOnly) == (int)FieldFlags.ReadOnly)
+            {
+                myFlags = myFlags | FieldFlags.ReadOnly;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.ComboBox) == (int)FieldFlags.ComboBox)
+            {
+                myFlags = myFlags | FieldFlags.ComboBox;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.KeyWord) == (int)FieldFlags.KeyWord)
+            {
+                myFlags = myFlags | FieldFlags.KeyWord;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.NamedObj) == (int)FieldFlags.NamedObj)
+            {
+                myFlags = myFlags | FieldFlags.NamedObj;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.ExObj) == (int)FieldFlags.ExObj)
+            {
+                myFlags = myFlags | FieldFlags.ExObj;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Hidden) == (int)FieldFlags.Hidden)
+            {
+                myFlags = myFlags | FieldFlags.Hidden;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Disabled) == (int)FieldFlags.Disabled)
+            {
+                myFlags = myFlags | FieldFlags.Disabled;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Protected) == (int)FieldFlags.Protected)
+            {
+                myFlags = myFlags | FieldFlags.Protected;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.SaveBits) == (int)FieldFlags.SaveBits)
+            {
+                myFlags = myFlags | FieldFlags.SaveBits;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Dragable) == (int)FieldFlags.Dragable)
+            {
+                myFlags = myFlags | FieldFlags.Dragable;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.Searchable) == (int)FieldFlags.Searchable)
+            {
+                myFlags = myFlags | FieldFlags.Searchable;
+            }
+            if ((Convert.ToInt32(infoValue, 16) & (int)FieldFlags.ScreenPainter) == (int)FieldFlags.ScreenPainter)
+            {
+                myFlags = myFlags | FieldFlags.ScreenPainter;
+            }
+            return myFlags;
+        }
+
+
+
+
+
+    }
+
+}
