@@ -1,0 +1,248 @@
+namespace RestSamples
+{
+    public partial class Form1 : Form
+    {
+        string endpoint = "[http://YOUR%20SERVER]http://YOUR SERVER";
+        string port = "YOUR REST API PORT";
+        string library = "YOUR LIBRARY";
+        string userName = "YOUR USER";
+        string password = "YOUR PASSWORD";
+ 
+               
+        public Form1()
+        {
+            InitializeComponent();
+        }
+ 
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            //Get Cookies  
+            CookieContainer myCookies = GetCookies(endpoint + ":" + port + "/edocsapi/v0.1/connect?library = " + library, userName, password, library);
+ 
+          //GET
+            
+          //Recently Edited List 
+ 
+            //Return recently edited list.This sample shows how to return a max of 25 docs sorted decending by date 
+            DMRESTCLIENT RedList = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/folders/recentedits?library="+library +"&start=0&max=25&descending=%RECENTACTIVITYDATE" );
+            string redListReponse = RedList.MakeRequest();
+ 
+         //Folders and Workspaces 
+ 
+            //Return Public Folders 
+            DMRESTCLIENT PublicFolders = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/folders/public?library="+ library);
+            string publicFoldersResponse = PublicFolders.MakeRequest();
+ 
+            //Return Folder Contents
+            string folderDocNumber = "18825";  //Supply docnumber of Folder
+            DMRESTCLIENT FolderContents = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/folders/" + folderDocNumber + "?library=" + library);
+            string folderContents = FolderContents.MakeRequest();
+ 
+            //Return Workspaces 
+            DMRESTCLIENT Workspaces = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/workspaces?library=" + library);
+            string workSpacesResponse = Workspaces.MakeRequest();
+ 
+            //Return Workspace Contents 
+            string WorkspaceDocNumber = "18866";  //Supply docnumber of Workspace
+            DMRESTCLIENT WorkSpaceContents = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/workspaces/" + WorkspaceDocNumber + "?library=" + library);
+            string workSpaceContentsResponse = WorkSpaceContents.MakeRequest();
+ 
+            //Return Saved Searches 
+            DMRESTCLIENT SavedSearches = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/searches?library=" + library);
+            string saveSearchResponse = SavedSearches.MakeRequest();
+ 
+ 
+         //Documents
+ 
+            //Return Profile Metadata
+            string docNumber = "18824"; //Supply a docnumber 
+            DMRESTCLIENT DocumentMetadata = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/documents/" + docNumber + "/profile?library=" + library);
+            string docMetaDataresponse = DocumentMetadata.MakeRequest();
+ 
+            //Return Version Information
+            DMRESTCLIENT VersionInfo = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/documents/" + docNumber + "/versions?library=" + library);
+            string VersionInforesponse = VersionInfo.MakeRequest();
+ 
+            //Return Doc History 
+            DMRESTCLIENT DocHistory = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/documents/" + docNumber + "/history?library=" + library);
+            string dochistoryResponse = DocHistory.MakeRequest();
+ 
+            //Return Document Security
+            DMRESTCLIENT Docsecurity = new DMRESTCLIENT(myCookies, HttpVerb.GET, endpoint + ":" + port + "/edocsapi/v1.0/documents/" + docNumber + "/security?library=" + library);
+            string docSecurityResponse = Docsecurity.MakeRequest();
+ 
+            //POST
+ 
+            //Profile Search 
+            DMRESTCLIENT ProfileSearch = new DMRESTCLIENT(myCookies, HttpVerb.POST, endpoint + ":" + port + "/edocsapi/v1.0/searches/evaluation?library=" + library);
+            ProfileSearch.PostData ="{\"data\":{\"DESCRIPTION\":\"18866\",\"criteria\":{ \"DOCNUM\":\"18866\"}}}"; //Post Search Criteria(ex. DOCNUMBER)
+            string profileSearchResponse = ProfileSearch.MakeRequest();
+ 
+            //Content Search 
+            DMRESTCLIENT ContentSearch = new DMRESTCLIENT(myCookies, HttpVerb.POST, endpoint + ":" + port + "/edocsapi/v1.0/searches/evaluation?library=" + library);
+            ContentSearch.PostData = "{\"data\":{\"DESCRIPTION\":\"test\",\"criteria\":{ \"FULLTEXT_EASY_SEARCH\":\"test\"}}}"; //Post Search Criteria (searching for the word "test")
+            string contentSearchResponse = ContentSearch.MakeRequest();
+ 
+            
+ 
+ 
+        }
+ 
+ 
+        public static CookieContainer GetCookies(string url, string userName, string password, string libraryName)
+        {
+            Dictionary<string, string> Cookies = new Dictionary<string, string>();
+            CookieContainer cookieJar = new CookieContainer();
+            HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(url);
+            request.CookieContainer = cookieJar;
+            request.Method = "POST";
+            using (var streamWriter = new StreamWriter(request.GetRequestStream()))
+            {
+                string json = "{\"data\":{\"userid\":\"" + userName + "\",\"password\":\"" + password + "\",\"library\":\"" + libraryName + "\"}}";
+ 
+ 
+                streamWriter.Write(json);
+                streamWriter.Flush();
+                streamWriter.Close();
+            }
+ 
+            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+ 
+            return cookieJar;
+        }
+ 
+ 
+         
+    }
+ 
+ 
+ 
+    public enum HttpVerb 
+    {
+        GET, 
+        POST,
+        PUT, 
+        DELETE
+ 
+    }
+ 
+         
+    public class DMRESTCLIENT
+ 
+    {
+ 
+        public string EndPoint { get; set; } 
+        public HttpVerb Method { get; set; }
+        public string ContentType { get; set; }
+        public string PostData { get; set; }
+        public CookieContainer cookieJar { get; set; }
+ 
+ 
+         
+ 
+        public DMRESTCLIENT(CookieContainer cookies, HttpVerb method, string endpoint) 
+ 
+        {
+ 
+            EndPoint = endpoint; 
+            Method = method; 
+            ContentType = "text/xml"; 
+            PostData = ""; 
+            cookieJar = cookies;
+ 
+        }
+ 
+ 
+         
+        public string MakeRequest() 
+        {
+ 
+            return MakeRequest(""); 
+        }
+ 
+        public string MakeRequest(string parameters)
+ 
+        {
+ 
+            var request = (HttpWebRequest)WebRequest.Create(EndPoint + parameters); 
+ 
+ 
+            request.Method = Method.ToString(); 
+            request.ContentLength = 0; 
+            request.CookieContainer = cookieJar; 
+            request.ContentType = ContentType;
+ 
+ 
+ 
+            if (!string.IsNullOrEmpty(PostData) && Method == HttpVerb.POST)
+ 
+            {
+ 
+                var encoding = new UTF8Encoding(); 
+                var bytes = Encoding.GetEncoding("iso-8859-1").GetBytes(PostData);
+                request.ContentLength = bytes.Length; 
+ 
+ 
+                using (var writeStream = request.GetRequestStream())
+ 
+                {
+                    writeStream.Write(bytes, 0, bytes.Length);
+ 
+                }
+ 
+            }
+ 
+            
+            using (var response = (HttpWebResponse)request.GetResponse())
+ 
+            {
+ 
+                var responseValue = string.Empty; 
+ 
+ 
+                if (response.StatusCode != HttpStatusCode.OK)
+ 
+                {
+ 
+                    var message = String.Format("Request failed. Received HTTP {0}", response.StatusCode); 
+                    throw new ApplicationException(message);
+ 
+                }
+ 
+ 
+ 
+                // grab the response
+ 
+                using (var responseStream = response.GetResponseStream()) 
+                {
+ 
+                    if (responseStream != null)
+ 
+                        using (var reader = new StreamReader(responseStream)) 
+                        {
+ 
+                            responseValue = reader.ReadToEnd();
+ 
+                        }
+ 
+                } 
+ 
+ 
+                return responseValue;
+ 
+ 
+ 
+            }
+ 
+        }
+ 
+ 
+ 
+        
+ 
+ 
+ 
+ 
+ 
+ 
+    } // class
