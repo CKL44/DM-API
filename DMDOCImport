@@ -1,0 +1,355 @@
+
+
+            DMDocImport Docs = new DMDocImport("C:\\CodeTest", dst, lib, user);
+
+class DMDocImport
+    {
+
+
+        public DMDocImport(string SourceFolder, string dst, string library, string author)
+        {
+
+
+            TraverseTreeParallelDMFiles(SourceFolder, (f) =>
+            {
+
+                try
+                {
+                    //byte[] data = File.ReadAllBytes(f);
+
+                }
+                catch (FileNotFoundException) { }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+
+                string docName = Path.GetFileNameWithoutExtension(f.ToString());
+                ProfileNewDocumentExample(dst, library, docName, author, f);
+
+
+                //Thread th = new Thread(() => this.ThreadSafe());
+                //th.Start();
+
+
+            });
+
+
+        }
+
+
+
+
+
+
+        public static void TraverseTreeParallelDMFiles(string root, Action<string> action)
+        {
+            //Count of files traversed and timer for diagnostic output
+            int fileCount = 0;
+            var sw = Stopwatch.StartNew();
+
+            // Determine whether to parallelize file processing on each folder based on processor count.
+            int procCount = System.Environment.ProcessorCount;
+
+            // Data structure to hold names of subfolders to be examined for files.
+            Stack<string> dirs = new Stack<string>();
+
+            if (!Directory.Exists(root))
+            {
+                throw new ArgumentException();
+            }
+            dirs.Push(root);
+
+            while (dirs.Count > 0)
+            {
+                string currentDir = dirs.Pop();
+                string[] subDirs = { };
+                string[] files = { };
+
+                try
+                {
+                    subDirs = Directory.GetDirectories(currentDir);
+                }
+                // Thrown if we do not have discovery permission on the directory.
+                catch (UnauthorizedAccessException e)
+                {
+                    Console.WriteLine(e.Message);
+                    continue;
+                }
+                // Thrown if another process has deleted the directory after we retrieved its name.
+                catch (DirectoryNotFoundException e)
+                {
+                    Console.WriteLine(e.Message);
+                    continue;
+                }
+
+                try
+                {
+                    files = Directory.GetFiles(currentDir);
+                }
+                catch (UnauthorizedAccessException e)
+                {
+                    Console.WriteLine(e.Message);
+                    continue;
+                }
+                catch (DirectoryNotFoundException e)
+                {
+                    Console.WriteLine(e.Message);
+                    continue;
+                }
+                catch (IOException e)
+                {
+                    Console.WriteLine(e.Message);
+                    continue;
+                }
+
+                // Execute in parallel if there are enough files in the directory.
+                // Otherwise, execute sequentially.Files are opened and processed
+                // synchronously but this could be modified to perform async I/O.
+                try
+                {
+                    if (files.Length < procCount)
+                    {
+                        foreach (var file in files)
+                        {
+                            action(file);
+                            fileCount++;
+                        }
+                    }
+                    else
+                    {
+                        Parallel.ForEach(files, () => 0, (file, loopState, localCount) =>
+                        {
+                            action(file);
+                            return (int)++localCount;
+                        },
+                                         (c) =>
+                                         {
+                                             Interlocked.Add(ref fileCount, c);
+                                         });
+                    }
+                }
+                catch (AggregateException ae)
+                {
+                    ae.Handle((ex) =>
+                    {
+                        if (ex is UnauthorizedAccessException)
+                        {
+                            // Here we just output a message and go on.
+                            Console.WriteLine(ex.Message);
+                            return true;
+                        }
+                        // Handle other exceptions here if necessary...
+
+                        return false;
+                    });
+                }
+
+                // Push the subdirectories onto the stack for traversal.
+                // This could also be done before handing the files.
+                foreach (string str in subDirs)
+                    dirs.Push(str);
+            }
+
+
+
+
+
+        }
+
+
+        public static void ProfileNewDocumentExample(string strDST, string libraryName, string documentName, string documentAuthor, string filePath)
+
+        //UPLOADING A NEW PROFILE 
+        {
+            PCDDocObject dmDoc = new PCDDocObject();
+            PCDPutDoc dmPutDoc = new PCDPutDoc();
+            PCDPutStream dmPutStream = new PCDPutStream();
+
+            string documentNumber;
+            string docext;
+            string versionID;
+
+            //Login to obtain a DST         
+            //PCDLogin oLogin = new PCDLogin();
+            //oLogin.AddLogin(0, libraryName, "YOUR USER", "YOUR PASSWORD");
+            //oLogin.Execute();
+            //string strDST = oLogin.GetDST();
+
+            //Obtain and parse the file extension
+            //OpenFileDialog dlgOpen = new OpenFileDialog();
+            //dlgOpen.ShowDialog();
+            string strExtension = (System.IO.Path.GetExtension(filePath));
+            strExtension = strExtension.Substring(1);
+            //string filePath = dlgOpen.FileName;
+            string appID = null;
+
+            //Determine the APP_ID based on the extension of the file 
+            switch (strExtension)
+            {
+                case "doc":
+                case "docx":
+                    appID = "MS WORD";
+                    break;
+
+                case "xls":
+                case "xlsx":
+                    appID = "MS EXCEL";
+                    break;
+
+                case "ppt":
+                case "pptx":
+                    appID = "MS POWERPOINT";
+                    break;
+
+                case "msg":
+                    appID = "MS OUTLOOK";
+                    break;
+
+
+                case "pdf":
+                    appID = "ACROBAT";
+                    break;
+
+            }
+
+
+            try
+            {
+                //FIRST CREATE THE PROFILE
+                dmDoc.SetDST(strDST);
+                dmDoc.SetObjectType("LAWPROF");
+                dmDoc.SetProperty("%TARGET_LIBRARY", libraryName);
+                dmDoc.SetProperty("DOCNAME", documentName);
+                dmDoc.SetProperty("TYPE_ID", "DEFAULT");
+                dmDoc.SetProperty("FILE_EXTENSION", strExtension);
+                dmDoc.SetProperty("APP_ID", appID);
+                dmDoc.SetProperty("AUTHOR_ID", documentAuthor);
+                dmDoc.SetProperty("TYPIST_ID", documentAuthor);
+                dmDoc.SetProperty("CLIENT_ID", "default");
+                dmDoc.SetProperty("MATTER_ID", "default");
+                dmDoc.SetProperty("%VERIFY_ONLY", "%YES");
+                dmDoc.Create();
+
+                if (dmDoc.ErrNumber == 0)
+
+                    dmDoc.SetProperty("%VERIFY_ONLY", "%NO");
+
+
+                else
+
+                    throw (new System.Exception("Error attempting to create profile"));
+
+                dmDoc.Create();
+
+                if (dmDoc.ErrNumber == 0)
+                {
+                    documentNumber = dmDoc.GetReturnProperty("%OBJECT_IDENTIFIER").ToString();
+                    versionID = dmDoc.GetReturnProperty("%VERSION_ID").ToString();
+                }
+
+                else
+                {
+
+                    throw (new System.Exception("Error" + ":" + dmDoc.ErrNumber.ToString() + " " + dmDoc.ErrDescription.ToString()));
+
+
+                }
+
+
+                //SECOND UPLOAD THE DOCUMENT
+
+                dmPutDoc.SetDST(strDST);
+                dmPutDoc.AddSearchCriteria("%TARGET_LIBRARY", libraryName);
+                dmPutDoc.AddSearchCriteria("%DOCUMENT_NUMBER", documentNumber);
+                dmPutDoc.AddSearchCriteria("%VERSION_ID", versionID);
+                dmPutDoc.Execute();
+                dmPutDoc.NextRow();
+                dmPutStream = dmPutDoc.GetPropertyValue("%CONTENT") as PCDPutStream;
+                int byteswritten;
+                System.IO.FileStream fs;
+                System.IO.BinaryReader r;
+
+
+                int CHUNK_SIZE = 65554;
+                fs = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read);
+                r = new System.IO.BinaryReader(fs);
+
+
+                int FSize = (int)fs.Length;
+
+                byte[] chunk = r.ReadBytes(CHUNK_SIZE);
+                while (chunk.Length > 0)
+                {
+                    dmPutStream.Write(chunk, chunk.Length, out byteswritten);
+
+                    if (FSize < CHUNK_SIZE)
+                    {
+                        CHUNK_SIZE = FSize;
+                        chunk = r.ReadBytes(CHUNK_SIZE);
+                    }
+
+                    else
+
+                        chunk = r.ReadBytes(CHUNK_SIZE);
+
+                }
+
+
+                dmPutStream.SetComplete();
+                if (dmPutStream.ErrNumber == 0)
+                {
+                    docext = dmDoc.GetProperty("FILE_EXTENSION");
+                   //a MessageBox.Show("FILE HAS UPLOADED SUCCESSFULLY");
+                }
+
+                else
+                {
+                    MessageBox.Show("ERROR:" + dmPutStream.ErrNumber + " " + dmPutStream.ErrDescription);
+                }
+
+                if (dmDoc != null)
+                    Marshal.FinalReleaseComObject(dmDoc);
+                dmDoc = null;
+                fs.Close();
+
+                //Unlock Document     
+                dmDoc = new PCDDocObject();
+                dmDoc.SetDST(strDST);
+                dmDoc.SetObjectType("LAWPROF");
+                dmDoc.SetProperty("%TARGET_LIBRARY", libraryName);
+                dmDoc.SetProperty("%OBJECT_IDENTIFIER", documentNumber);
+                dmDoc.SetProperty("%STATUS", "%UNLOCK");
+                dmDoc.Update();
+
+                if (dmDoc.ErrNumber != 0)
+                    throw (new System.Exception("ERROR: Could Not Unlock Document -" + dmDoc.ErrDescription));
+            }
+
+
+
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+
+            finally
+            {
+
+                if (dmPutStream != null)
+                    Marshal.FinalReleaseComObject(dmPutStream);
+
+                if (dmPutDoc != null)
+                    Marshal.FinalReleaseComObject(dmPutDoc);
+
+                if (dmDoc != null)
+                    Marshal.FinalReleaseComObject(dmDoc);
+
+            }
+
+        }
+
+
+
+    } // end of class
+}
+
+
