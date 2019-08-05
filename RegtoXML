@@ -1,0 +1,261 @@
+public void GenerateXMLFile( string location)
+
+        {
+
+            DMReg dmReg = new DMReg();
+
+            ////For Genearting XML Only
+
+            dmReg.AllRegData.TableName = "eDOCS";
+
+            System.Data.DataColumn newColumn = new System.Data.DataColumn("BEST_PRACTICE", typeof(System.String));
+
+            newColumn.DefaultValue = "NONE";
+
+ 
+
+            dmReg.AllRegData.Columns.Add(newColumn);
+
+            dmReg.AllRegData.WriteXml(location);
+
+ 
+
+        }
+
+    }
+
+}
+
+ 
+
+class DMReg
+
+    {
+
+ 
+
+        private DataTable _registryData = new DataTable();
+
+        private DataTable _HKCURegData = new DataTable();
+
+        private DataTable _HKLMRegData = new DataTable();
+
+        private RegistryKey _hkcu = Registry.CurrentUser;
+
+        private RegistryKey _hklm = Registry.LocalMachine;
+
+ 
+
+        public DataTable AllRegData { get { return _registryData; } }
+
+        public DataTable HKCURegData { get { return _HKCURegData; } }
+
+        public DataTable HKLMRegData { get { return _HKLMRegData; } }
+
+ 
+
+ 
+
+        public DMReg()
+
+        {
+
+ 
+
+            //Build Data Tables one for hklm and hkcu   
+
+            _HKCURegData.Columns.Add("PATH", typeof(string));
+
+            _HKCURegData.Columns.Add("KEY", typeof(string));
+
+            _HKCURegData.Columns.Add("VALUE", typeof(string));
+
+            _HKLMRegData.Columns.Add("PATH", typeof(string));
+
+            _HKLMRegData.Columns.Add("KEY", typeof(string));
+
+            _HKLMRegData.Columns.Add("VALUE", typeof(string));
+
+ 
+
+            //open subkeys
+
+ 
+
+            _hkcu = _hkcu.OpenSubKey("Software\\HUMMINGBIRD");
+
+            _hklm = _hklm.OpenSubKey("Software\\HUMMINGBIRD");
+
+            HKCUtoDataTable(_hkcu, _HKCURegData);
+
+            HKLMtoDataTable(_hklm, _HKLMRegData);
+
+ 
+
+            //_hklm = Registry.LocalMachine; // reset local machine value
+
+            //_hklm = _hklm.OpenSubKey("Software\\WOW6432Node\\HUMMINGBIRD");
+
+ 
+
+            HKLMtoDataTable(_hklm, _HKLMRegData);
+
+ 
+
+            //Merge Tables together for All RegData
+
+            _registryData = _HKCURegData;
+
+            _registryData.Merge(_HKLMRegData);
+
+ 
+
+ 
+
+ 
+
+        }
+
+ 
+
+        public static void HKCUtoDataTable(RegistryKey SubKey, DataTable datatable)
+
+        {
+
+ 
+
+            foreach (string sub in SubKey.GetSubKeyNames())
+
+            {
+
+                RegistryKey hkcu = Registry.CurrentUser;
+
+                hkcu = SubKey.OpenSubKey(sub, true);
+
+ 
+
+                foreach (string v in hkcu.GetValueNames())
+
+                {
+
+                    string val = hkcu.GetValue(v).ToString();
+
+                    if (!String.IsNullOrEmpty(val))
+
+                    {
+
+                        DataRow row = datatable.NewRow();
+
+                        row["PATH"] = hkcu;
+
+                        row["KEY"] = v;
+
+                        row["VALUE"] = val;
+
+                        datatable.Rows.Add(row);
+
+                    }
+
+                }
+
+ 
+
+                //recursive to get all keys
+
+                HKCUtoDataTable(hkcu, datatable);
+
+ 
+
+            }
+
+  
+
+        }
+
+         private void HKLMtoDataTable(RegistryKey SubKey, DataTable datatable)
+
+        {
+
+            try
+
+            {
+
+                foreach (string sub in SubKey.GetSubKeyNames())
+
+                {
+
+                    try
+
+                    {
+
+ 
+
+                        RegistryKey hklm = Registry.LocalMachine;
+
+                        hklm = SubKey.OpenSubKey(sub, true);
+
+ 
+
+                        foreach (string v in hklm.GetValueNames())
+
+                        {
+
+                            string val = hklm.GetValue(v).ToString();
+
+                            if (!String.IsNullOrEmpty(val))
+
+                            {
+
+ 
+
+ 
+
+                                DataRow row = datatable.NewRow();
+
+                                row["PATH"] = hklm;
+
+                                row["KEY"] = v;
+
+                                row["VALUE"] = val;
+
+                                datatable.Rows.Add(row);
+
+                            }
+
+                        }
+
+ 
+
+                        //recursive to get all keys
+
+                        HKLMtoDataTable(hklm, datatable);
+
+                    }
+
+ 
+
+                    catch (Exception ex)
+
+                    {
+
+                        //for securty exceptions
+
+ 
+
+                    }
+
+                }
+
+ 
+
+            }
+
+ 
+
+            catch { }
+
+ 
+
+ 
+
+        }
