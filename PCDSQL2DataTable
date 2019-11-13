@@ -1,0 +1,369 @@
+class DM
+    {
+        //properties
+        private string errors;
+        private DataTable results;
+        private bool err;
+        private List<string> docNumbers;
+ 
+ 
+ 
+ 
+ 
+        public string DST { get; set; }
+        public string library { get; set; }
+        public string query { get; set; }
+        public bool error { get { return err; } }
+ 
+        public string errorOutput { get { return errors; } }
+ 
+ 
+        public DataTable Results { get { return results; } }
+        public List<string> DocNumbers { get { return docNumbers; } }
+ 
+ 
+ 
+        //constructor
+        public DM(string libraryName, string DST, string query)
+        {
+            results = BuildDataTable2(libraryName, DST, query);
+            if (CheckforErrors(results) == true)
+            {
+                err = true;
+ 
+                errors = ErrorOutput(results);
+ 
+ 
+            }
+ 
+            if (err == false)
+            {
+                if (results.Columns.Contains("DOCNUMBER"))
+                {
+                    docNumbers = GetDocNumbers(results);
+ 
+                }
+            }
+ 
+        }
+ 
+ 
+        private DataTable ExecuteSelect(string libraryName, string dst, string query)
+        {
+ 
+            DataTable DT = new DataTable();
+            PCDSQL dmSQL = new PCDSQL();
+ 
+            dmSQL.SetDST(dst);
+            dmSQL.SetLibrary(libraryName);
+ 
+            try
+            {
+ 
+                dmSQL.Execute(query);
+ 
+                //save off the error description, these change after a call to GetSQLErrorCode().
+                int errNum = dmSQL.ErrNumber;
+                string errDesc = dmSQL.ErrDescription;
+ 
+                //Check the return code from the API call
+                // 9 = No Rows returned
+                // 0 = No Error
+                if (dmSQL.GetSQLErrorCode() != 0)
+                {
+                    DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                    DT.Columns.Add("ERROR_DESC", typeof(string));
+                    DataRow row = DT.NewRow();
+                    row["ERROR_NUMBER"] = dmSQL.ErrNumber.ToString();
+                    row["ERROR_DESC"] = dmSQL.ErrDescription;
+                    DT.Rows.Add(row);
+                }
+ 
+ 
+ 
+                if (dmSQL.GetRowCount() == 0)
+                {
+                    dmSQL.ReleaseResults();
+                    return DT;
+                }
+ 
+                //
+                //Load the table
+                //
+ 
+                //Add the columns
+                //1
+                for (int curCol = 1; curCol <= dmSQL.GetColumnCount(); curCol++)
+                {
+                    if (!DT.Columns.Contains(dmSQL.GetColumnName(curCol)))
+                    {
+ 
+                        DT.Columns.Add((string)dmSQL.GetColumnName(curCol));
+                    }
+                }
+ 
+                //Add the rows
+                for (int curRow = 1; curRow <= dmSQL.GetRowCount(); curRow++)
+                {
+                    DataRow curDataRow = DT.NewRow();
+ 
+                    for (int curCol = 1; curCol <= dmSQL.GetColumnCount(); curCol++)
+                    {
+                        curDataRow[curCol - 1] = dmSQL.GetColumnValue(curCol);
+                    }
+ 
+                    DT.Rows.Add(curDataRow);
+ 
+                    dmSQL.NextRow();
+                }
+ 
+            }
+ 
+            catch (Exception ex)
+            {
+ 
+                DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                DT.Columns.Add("ERROR_DESC", typeof(string));
+                DataRow row = DT.NewRow();
+                row["ERROR_NUMBER"] = ex.HResult.ToString();
+                row["ERROR_DESC"] = ex.Message.ToString();
+                DT.Rows.Add(row);
+ 
+            }
+ 
+            dmSQL.ReleaseResults();
+            //Return the table
+            return DT;
+ 
+        }
+ 
+        private DataTable BuildDataTable2(string libraryName, string DST, string strSQL)
+        {
+            DataTable DT = new DataTable();
+ 
+            PCDSQL dmSQL = new PCDSQL();
+            dmSQL.SetDST(DST);
+            dmSQL.SetLibrary(libraryName);
+ 
+            try
+            {
+                dmSQL.Execute(strSQL);
+                if (dmSQL.ErrNumber == 0)
+                {
+ 
+                    int numRows = dmSQL.GetRowCount();
+                    int numColumns = dmSQL.GetColumnCount(); // Get number of cols 
+                    List<string> colnamesList = new List<string>();
+ 
+ 
+                    for (int i = 1; i <= numColumns; i++)
+                    {
+ 
+                        string colName = dmSQL.GetColumnName(i);
+                        colnamesList.Add(colName);
+                        colnamesList = colnamesList.Distinct().ToList();
+ 
+                    }
+ 
+                    foreach (string name in colnamesList)
+                    {
+                        DT.Columns.Add(name, typeof(string));  // Add columns to data set 
+                    }
+ 
+ 
+ 
+                    while (numRows > 0)
+                    {
+                        DataRow dRow = DT.NewRow();
+                        for (int i = 1; i <= colnamesList.Count; i++)
+                        {
+ 
+                            string value = dmSQL.GetColumnValue(i).ToString();
+ 
+ 
+                            dRow[i - 1] = value;
+                            //dRow[i] = value;
+                            //DT.Rows.Add(dRow);
+ 
+                        }
+ 
+ 
+ 
+                        DT.Rows.Add(dRow);
+                        numRows = numRows - 1;
+                        dmSQL.NextRow();
+ 
+ 
+ 
+                    }
+                }
+ 
+                else
+                {
+ 
+                    DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                    DT.Columns.Add("ERROR_DESC", typeof(string));
+                    DataRow row = DT.NewRow();
+                    row["ERROR_NUMBER"] = dmSQL.ErrNumber.ToString();
+                    row["ERROR_DESC"] = dmSQL.ErrDescription;
+                    DT.Rows.Add(row);
+                }
+ 
+            }
+ 
+            catch (Exception ex)
+            {
+ 
+                DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                DT.Columns.Add("ERROR_DESC", typeof(string));
+                DataRow row = DT.NewRow();
+                row["ERROR_NUMBER"] = ex.HResult.ToString();
+                row["ERROR_DESC"] = ex.Message.ToString();
+                DT.Rows.Add(row);
+            }
+ 
+ 
+            dmSQL.ReleaseResults();
+            return DT;
+ 
+ 
+        }
+ 
+ 
+ 
+ 
+ 
+        private DataTable BuildDataTable(string libraryName, string DST, string strSQL)
+        {
+            DataTable DT = new DataTable();
+ 
+            PCDSQL dmSQL = new PCDSQL();
+            dmSQL.SetDST(DST);
+            dmSQL.SetLibrary(libraryName);
+ 
+            try
+            {
+                dmSQL.Execute(strSQL);
+                if (dmSQL.ErrNumber == 0)
+                {
+ 
+                    int numRows = dmSQL.GetRowCount();
+                    int numColumns = dmSQL.GetColumnCount(); // Get number of cols 
+                    for (int i = 1; i <= numColumns; i++)
+                    {
+ 
+                        string colName = dmSQL.GetColumnName(i);
+ 
+                        if (!DT.Columns.Contains(colName))
+                        {
+                            DT.Columns.Add(dmSQL.GetColumnName(i).ToString(), typeof(string));  // Add columns to data set 
+                        }
+                    }
+ 
+                    //DataRow dRow = DT.NewRow();
+ 
+ 
+                    while (numRows > 0)
+                    {
+                        DataRow dRow = DT.NewRow();
+                        for (int i = 1; i <= dmSQL.GetColumnCount(); i++)
+                        {
+ 
+                            string value = dmSQL.GetColumnValue(i).ToString();
+ 
+ 
+                            dRow[i - 1] = value;
+                            //dRow[i] = value;
+                            //DT.Rows.Add(dRow);
+ 
+                        }
+ 
+ 
+ 
+                        DT.Rows.Add(dRow);
+                        numRows = numRows - 1;
+                        dmSQL.NextRow();
+ 
+ 
+ 
+                    }
+                }
+ 
+                else
+                {
+ 
+                    DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                    DT.Columns.Add("ERROR_DESC", typeof(string));
+                    DataRow row = DT.NewRow();
+                    row["ERROR_NUMBER"] = dmSQL.ErrNumber.ToString();
+                    row["ERROR_DESC"] = dmSQL.ErrDescription;
+                    DT.Rows.Add(row);
+                }
+ 
+            }
+ 
+            catch (Exception ex)
+            {
+ 
+                DT.Columns.Add("ERROR_NUMBER", typeof(string));
+                DT.Columns.Add("ERROR_DESC", typeof(string));
+                DataRow row = DT.NewRow();
+                row["ERROR_NUMBER"] = ex.HResult.ToString();
+                row["ERROR_DESC"] = ex.Message.ToString();
+                DT.Rows.Add(row);
+            }
+ 
+ 
+            dmSQL.ReleaseResults();
+            return DT;
+ 
+ 
+        }
+ 
+        private bool CheckforErrors(DataTable dT)
+        {
+            bool er = false;
+ 
+            if (dT.Columns.Contains("ERROR_NUMBER"))
+            { er = true; }
+ 
+            return er;
+        }
+ 
+ 
+        private string ErrorOutput(DataTable dT)
+        {
+            StringBuilder output = new StringBuilder();
+            foreach (DataRow rows in dT.Rows)
+            {
+                foreach (DataColumn col in dT.Columns)
+                {
+                    output.AppendFormat("{0} ", rows[col]);
+                }
+ 
+                output.AppendLine();
+            }
+ 
+            return output.ToString();
+        }
+ 
+        private List<string> GetDocNumbers(DataTable dt)
+        {
+ 
+ 
+ 
+            List<string> docnumber = new List<string>();
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                docnumber.Add(dt.Rows[i]["DOCNUMBER"].ToString());
+            }
+ 
+ 
+ 
+ 
+ 
+            return docnumber;
+        }
+ 
+    }
+}
