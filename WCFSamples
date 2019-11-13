@@ -1,0 +1,928 @@
+
+ 
+// Sample Usage
+ public partial class Form1 : Form
+    {
+        string server = "YOUR SERVER";
+        string protocol = "http";
+        int port = 8080;
+        string library = "YOUR LIBRARY";
+        string userName = "USER";
+        string password = "PASSWORD";
+        bool windowsAuth = false;
+        bool useLic = false;
+        string dst = string.Empty;
+        string downloadLocation = @"C:\CodeTest\"; //example
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+           dst =  DMWCFAPI.LoginToDM(server, port, protocol, library, userName, password, windowsAuth, useLic);
+           DMWCFAPI.DownloadDocument(733, 1448,  downloadLocation);
+
+        }
+    }
+
+ 
+ public static class DMWCFAPI
+        {
+            private static string _server, _protocol, _library, _dst;
+            private static int _port;
+
+            #region Client Creation
+            /// <summary>
+            /// Creates the relevant DM WCF client to connect through HTTP. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreateHTTP(bool isSvcClient)
+            {
+                BasicHttpBinding binding = new BasicHttpBinding();
+                binding.MaxReceivedMessageSize = 0x7fffffff;
+                binding.ReaderQuotas.MaxArrayLength = 0x7fffffff;
+                binding.ReaderQuotas.MaxStringContentLength = 0x7fffffff;
+                if (isSvcClient)
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("http://{0}:{1}/DMSvr/Svc", _server, _port));
+                    return new DMSvcClient(binding, address);
+                }
+                else
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("http://{0}:{1}/DMSvr/Obj", _server, _port));
+                    return new DMObjClient(binding, address);
+                }
+            }
+
+            /// <summary>
+            /// Creates the relevant DM WCF client to connect through HTTPS. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreateHTTPS(bool isSvcClient)
+            {
+                BasicHttpBinding binding = new BasicHttpBinding();
+                binding.MaxReceivedMessageSize = 0x7fffffff;
+                binding.ReaderQuotas.MaxArrayLength = 0x7fffffff;
+                binding.ReaderQuotas.MaxStringContentLength = 0x7fffffff;
+                binding.Security.Mode = BasicHttpSecurityMode.Transport;
+                binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.None;
+                if (isSvcClient)
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("https://{0}:{1}/DMSvr/Svc", _server, _port));
+                    return new DMSvcClient(binding, address);
+                }
+                else
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("https://{0}:{1}/DMSvr/Obj", _server, _port));
+                    return new DMObjClient(binding, address);
+                }
+            }
+
+            /// <summary>
+            /// Creates the relevant DM WCF client to connect through NetTCP with TLS. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreateBasicNetTCP(bool isSvcClient)
+            {
+                NetTcpBinding binding = new NetTcpBinding();
+                binding.MaxReceivedMessageSize = 0x7fffffff;
+                binding.ReaderQuotas.MaxArrayLength = 0x7fffffff;
+                binding.ReaderQuotas.MaxStringContentLength = 0x7fffffff;
+                binding.Security.Mode = SecurityMode.None;
+                if (isSvcClient)
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("net.tcp://{0}:{1}/DMSvr/Svc", _server, _port));
+                    return new DMSvcClient(binding, address);
+                }
+                else
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("net.tcp://{0}:{1}/DMSvr/Obj", _server, _port));
+                    return new DMObjClient(binding, address);
+                }
+            }
+
+            /// <summary>
+            /// Creates the relevant DM WCF client to connect through NetTCP with TLS. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreateNetTCP(bool isSvcClient)
+            {
+                NetTcpBinding binding = new NetTcpBinding();
+                binding.MaxReceivedMessageSize = 0x7fffffff;
+                binding.ReaderQuotas.MaxArrayLength = 0x7fffffff;
+                binding.ReaderQuotas.MaxStringContentLength = 0x7fffffff;
+                binding.MaxConnections = 1;
+                if (isSvcClient)
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("net.tcp://{0}:{1}/DMSvr/Svc", _server, _port));
+                    return new DMSvcClient(binding, address);
+                }
+                else
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("net.tcp://{0}:{1}/DMSvr/Obj", _server, _port));
+                    return new DMObjClient(binding, address);
+                }
+            }
+
+            /// <summary>
+            /// Creates the relevant DM WCF client to connect through WS-HTTP. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreateWSHTTP(bool isSvcClient)
+            {
+                WSHttpBinding binding = new WSHttpBinding();
+                binding.MaxReceivedMessageSize = 0x7fffffff;
+                binding.ReaderQuotas.MaxArrayLength = 0x7fffffff;
+                binding.ReaderQuotas.MaxStringContentLength = 0x7fffffff;
+                if (isSvcClient)
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("http://{0}:{1}/DMSvr/Svc", _server, _port));
+                    return new DMSvcClient(binding, address);
+                }
+                else
+                {
+                    EndpointAddress address = new EndpointAddress(String.Format("http://{0}:{1}/DMSvr/Obj", _server, _port));
+                    return new DMObjClient(binding, address);
+                }
+            }
+
+            /// <summary>
+            /// Creates the relevant DM WCF client. It does not establish a connection to the DM Server at this point.
+            /// </summary>
+            /// <param name="isSvcClient">True for DMSvcClient, false for DMObjClient.</param>
+            /// <returns>An instance of the requested DM WCF client.</returns>
+            private static dynamic ClientCreate(bool isSvcClient)
+            {
+                switch (_protocol)
+                {
+                    case "HTTP":
+                        return ClientCreateHTTP(isSvcClient);
+                    case "HTTPS":
+                        return ClientCreateHTTPS(isSvcClient);
+                    case "BASICNETTCP":
+                        return ClientCreateBasicNetTCP(isSvcClient);
+                    case "NETTCP":
+                        return ClientCreateNetTCP(isSvcClient);
+                    case "WSHTTP":
+                        return ClientCreateWSHTTP(isSvcClient);
+                    default:
+                        throw new InvalidOperationException("Invalid protocol selected.");
+                }
+            }
+            #endregion
+
+            #region Template Functions
+            public static void DMSvcClientExample()
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true); // Initialise the object (connection is not made to server yet)
+                try // WCF connections should always be dealt within a try block
+                {
+                    // Communicate with DM Server via DMSvcClient here, this is where the connection will be made with the DM Server
+                    // dmSvcClient.DoSomething();
+                    dmSvcClient.Close(); // Close connection with server 'gracefully' once interaction has finished
+                }
+                catch (Exception ex) // Something bad happened, could be a network error, or a service fault
+                {
+                    dmSvcClient.Abort(); // Terminate connection with server
+                    throw ex; // Handle exception (or throw)
+                }
+            }
+
+            public static void DMObjClientExample()
+            {
+                DMObjClient dmObjClient = ClientCreate(false); // Initialise the object (connection is not made to server yet)
+                try // WCF connections should always be dealt within a try block
+                {
+                    // Communicate with DM Server via DMSvcClient here, this is where the connection will be made with the DM Server
+                    // dmObjClient.DoSomething();
+                    dmObjClient.Close(); // Close connection with server 'gracefully' once interaction has finished
+                }
+                catch (Exception ex) // Something bad happened, could be a network error, or a service fault
+                {
+                    dmObjClient.Abort(); // Terminate connection with server
+                    throw ex; // Handle exception (or throw)
+                }
+            }
+
+            public static void DMSvrAndObjClientExample()
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    // dmSvrClient.DoSomething()
+                    // dmObjClient.DoSomethingElse();
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+            #endregion
+
+            public static string[] GetLibraries(string dmServer, int port, string protocol)
+            {
+                // Set class-level variables
+                _server = dmServer;
+                _port = port;
+                _protocol = protocol.ToUpper();
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    string[] libraries = dmSvcClient.GetLoginLibraries(new GetLoginLibrariesCall()).libraries;
+                    dmSvcClient.Close();
+                    return libraries;
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static string[] GetRemoteLibraries()
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    SecureObjectCall objectCall = new SecureObjectCall();
+                    objectCall.dstIn = _dst;
+                    objectCall.objectType = "RemoteLibrariesCollection";
+                    objectCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 1,
+                        propertyNames = new string[1] { "%TARGET_LIBRARY" },
+                        propertyValues = new object[1] { _library }
+                    };
+                    DocObjectReply docReply = dmSvcClient.CreateObject(objectCall);
+                    string collectionID = docReply.retProperties.propertyValues[Array.IndexOf(docReply.retProperties.propertyNames, "%IUNKNOWN_INTERFACE")].ToString();
+                    NewEnumCall newEnumCall = new NewEnumCall();
+                    newEnumCall.dstIn = _dst;
+                    newEnumCall.collectionID = collectionID;
+                    NewEnumReply newEnumReply = dmObjClient.NewEnum(newEnumCall);
+                    ReleaseObjectCall releaseCollectionCall = new ReleaseObjectCall();
+                    releaseCollectionCall.objectID = collectionID;
+                    dmObjClient.ReleaseObject(releaseCollectionCall);
+                    const int ROW_FETCH_LIMIT = 20;
+                    List<string> remoteLibraries = new List<string>();
+                    while (true)
+                    {
+                        NextDataCall nextDataCall = new NextDataCall();
+                        nextDataCall.dstIn = _dst;
+                        nextDataCall.enumID = newEnumReply.enumID;
+                        nextDataCall.elementCount = ROW_FETCH_LIMIT;
+                        NextDataReply nextDataReply = dmObjClient.NextData(nextDataCall);
+                        int i = 0;
+                        for (; i < nextDataReply.genericItemsData.itemCount; i++)
+                            remoteLibraries.Add(nextDataReply.genericItemsData.propertyRows[i][Array.IndexOf(nextDataReply.genericItemsData.propertyNames, "LIBRARY_NAME")].ToString());
+                        if (i != ROW_FETCH_LIMIT)
+                            break;
+                    }
+                    ReleaseObjectCall releaseEnumCall = new ReleaseObjectCall();
+                    releaseEnumCall.objectID = newEnumReply.enumID;
+                    dmObjClient.ReleaseObject(releaseEnumCall);
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                    return remoteLibraries.ToArray();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static string LoginToDM(string dmServer, int port, string protocol, string library, string username, string password, bool useWindowsAuthentication, bool useLicence)
+            {
+                // Set class-level variables
+                _server = dmServer;
+                _port = port;
+                _protocol = protocol.ToUpper();
+                _library = library;
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    LoginCallSvr6 loginCall = new LoginCallSvr6();
+                    loginCall.loginInfo = new DMSvrLoginInfo[1];
+                    if (useWindowsAuthentication) // Auto-login method
+                        loginCall.loginInfo[0] = new DMSvrLoginInfo
+                        {
+                            loginContext = library,
+                            network = 512,
+                            username = WindowsIdentity.GetCurrent().Name
+                        };
+                    else // Manual login method
+                        loginCall.loginInfo[0] = new DMSvrLoginInfo
+                        {
+                            loginContext = library,
+                            network = 0,
+                            username = username,
+                            password = password
+                        };
+                    loginCall.authen = 1;
+                    if (useLicence)
+                        loginCall.version = String.Format("SecureAppID:{0} SecureAppKey:{1}", Resources.ApplicationName, Resources.ApplicationKey);
+                    LoginReplySvr6 loginReply = dmSvcClient.LoginSvr6(loginCall);
+                    dmSvcClient.Close();
+                    return _dst = loginReply.DSTOut; // Retrieve DST used for future calls to the DM Server
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+
+            #region Create
+            private static int CreateProfile(string profileForm, Dictionary<string, string> profileInfo, out int versionID)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    profileInfo.Add("%TARGET_LIBRARY", _library);
+                    SecureObjectCall objectCall = new SecureObjectCall();
+                    objectCall.dstIn = _dst;
+                    objectCall.objectType = profileForm;
+                    objectCall.properties = new NamedProperties()
+                    {
+                        propertyCount = profileInfo.Count,
+                        propertyNames = new string[profileInfo.Count],
+                        propertyValues = new object[profileInfo.Count]
+                    };
+                    int i = 0;
+                    foreach (var v in profileInfo)
+                    {
+                        objectCall.properties.propertyNames[i] = v.Key;
+                        objectCall.properties.propertyValues[i] = v.Value;
+                        i++;
+                    }
+                    /*
+                    objectCall.trustees = new Trustees() // Remove this section if you want to create an unsecured document.
+                    {
+                        trusteeCount = 3,
+                        trusteeFlags = new int[] { 2, 2, 1 }, // 1 for Group, 2 for User
+                        trusteeNames = new string[] { "user1", "user2", "groupA" },
+                        trusteeRights = new int[] { 255, 255, 1 }
+                    };
+                    */
+                    DocObjectReply docReply = dmSvcClient.CreateObject(objectCall);
+                    versionID = Convert.ToInt32(docReply.retProperties.propertyValues[Array.IndexOf(docReply.retProperties.propertyNames, "%VERSION_ID")]);
+                    MessageBox.Show("Version ID: " + versionID.ToString());
+                    dmSvcClient.Close();
+                    return Convert.ToInt32(docReply.retProperties.propertyValues[Array.IndexOf(docReply.retProperties.propertyNames, "%OBJECT_IDENTIFIER")]);
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static int CreateDocument(string profileForm, Dictionary<string, string> profileInfo, byte[] fileContents, int fileSize)
+            {
+                int versionID;
+                int documentNumber = CreateProfile(profileForm, profileInfo, out versionID); // Create the profile for the new document
+                UploadFile(documentNumber, versionID, fileContents, fileSize); // Attach the physical document to the created profile
+                UnlockDocument(documentNumber); // Check the document in
+                return documentNumber;
+            }
+
+            public static int CreateFolder(string profileForm, Dictionary<string, string> profileInfo)
+            {
+                int notUsed;
+                profileInfo.Add("APP_ID", "FOLDER");
+                return CreateProfile(profileForm, profileInfo, out notUsed);
+            }
+
+            public static int CreatePaperProfile(string profileForm, Dictionary<string, string> profileInfo)
+            {
+                int notUsed;
+                profileInfo.Add("APP_ID", "");
+                profileInfo.Add("STORAGE", "P");
+                return CreateProfile(profileForm, profileInfo, out notUsed);
+            }
+
+            public static void NewVersion(int documentNumber, string author, string typist, string comment, byte[] fileContents, int fileSize)
+            {
+                int versionID;
+                LockDocument(documentNumber);
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    DocObjectCall docCall = new DocObjectCall();
+                    docCall.dstIn = _dst;
+                    docCall.objectType = "v_defprof";
+                    docCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 6,
+                        propertyNames = new string[] { "%TARGET_LIBRARY", "%OBJECT_IDENTIFIER", "%VERSION_DIRECTIVE", "%VERSION_AUTHOR", "%VERSION_TYPIST", "%VERSION_COMMENT" },
+                        propertyValues = new object[] { _library, documentNumber, "%PCD_NEW_VERSION", author, typist, comment }
+                    };
+                    DocObjectReply docReply = dmSvcClient.UpdateObject(docCall);
+                    versionID = Convert.ToInt32(docReply.retProperties.propertyValues[Array.IndexOf(docReply.retProperties.propertyNames, "%VERSION_ID")]);
+                    dmSvcClient.Close();
+                    UploadFile(documentNumber, versionID, fileContents, fileSize);
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    UnlockDocument(documentNumber);
+                    throw ex;
+                }
+                UnlockDocument(documentNumber);
+            }
+
+            private static void UploadFile(int documentNumber, int versionID, byte[] fileContents, int fileSize)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    PutDocCall putDocCall = new PutDocCall();
+                    putDocCall.dstIn = _dst;
+                    putDocCall.libraryName = _library;
+                    putDocCall.documentNumber = documentNumber;
+                    putDocCall.versionID = versionID;
+                    PutDocReply putDocReply = dmSvcClient.PutDoc(putDocCall);
+                    GetWriteStreamCall getWriteCall = new GetWriteStreamCall();
+                    getWriteCall.dstIn = _dst;
+                    getWriteCall.contentID = putDocReply.putDocID;
+                    GetWriteStreamReply getWriteReply = dmObjClient.GetWriteStream(getWriteCall);
+                    WriteStreamCall writeCall = new WriteStreamCall();
+                    writeCall.streamID = getWriteReply.streamID;
+                    writeCall.streamData = new StreamData();
+                    writeCall.streamData.bufferSize = (uint)fileSize;
+                    writeCall.streamData.streamBuffer = fileContents;
+                    dmObjClient.WriteStream(writeCall);
+                    CommitStreamCall commitCall = new CommitStreamCall();
+                    commitCall.streamID = getWriteReply.streamID;
+                    dmObjClient.CommitStream(commitCall);
+                    ReleaseObjectCall releaseGetWriteCall = new ReleaseObjectCall();
+                    releaseGetWriteCall.objectID = getWriteReply.streamID;
+                    dmObjClient.ReleaseObject(releaseGetWriteCall);
+                    ReleaseObjectCall releasePutDocCall = new ReleaseObjectCall();
+                    releasePutDocCall.objectID = putDocReply.putDocID;
+                    dmObjClient.ReleaseObject(releasePutDocCall);
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+            #endregion
+
+            public static byte[] DownloadDocument(int documentNumber, int versionID,  string fileName)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                byte[] documentContent = new byte[0];
+                try
+                {
+                    GetDocCallSvr3 getDocCall = new GetDocCallSvr3();
+                    getDocCall.dstIn = _dst;
+                    getDocCall.criteria = new SearchCriteria()
+                    {
+                        criteriaCount = 3,
+                        criteriaNames = new string[] { "%TARGET_LIBRARY", "%DOCUMENT_NUMBER", "%VERSION_ID" },
+                        criteriaValues = new string[] { _library, documentNumber.ToString(), versionID.ToString() }
+                    };
+                    GetDocReplySvr3 getDocReply = dmSvcClient.GetDocSvr3(getDocCall);
+                    GetReadStreamCall getReadCall = new GetReadStreamCall();
+                    getReadCall.dstIn = _dst;
+                    getReadCall.contentID = getDocReply.getDocID;
+                    GetReadStreamReply getReadReply = dmObjClient.GetReadStream(getReadCall);
+                    StatStreamCall statCall = new StatStreamCall();
+                    statCall.streamID = getReadReply.streamID;
+                    StatStreamReply statReply = dmObjClient.StatStream(statCall);
+                    ulong fileSize = statReply.streamStatistics.size;
+                    ReadStreamCall readCall = new ReadStreamCall();
+                    readCall.streamID = getReadReply.streamID;
+                    readCall.requestedBytes = 52428800; // 50MB per call.
+                    while (true)
+                    {
+                        ReadStreamReply readReply = dmObjClient.ReadStream(readCall);
+                        if (readReply.streamData.streamBuffer.Length == 0)
+                            break;
+                        byte[] tempArray = documentContent;
+                        documentContent = new byte[tempArray.Length + readReply.streamData.streamBuffer.Length];
+                        Buffer.BlockCopy(tempArray, 0, documentContent, 0, tempArray.Length);
+                        Buffer.BlockCopy(readReply.streamData.streamBuffer, 0, documentContent, tempArray.Length, readReply.streamData.streamBuffer.Length);
+                    }
+                    ReleaseObjectCall releaseGetReadCall = new ReleaseObjectCall();
+                    releaseGetReadCall.objectID = getReadReply.streamID;
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                    string documentName = SearchLibrary("v_defprof", new Dictionary<string, string>() { { "DOCNUM", documentNumber.ToString() } }, new string[] { "DOCNAME" })[1, 0];
+                    string fileExtension = String.Empty;
+                    for (int i = 0; i < getDocReply.docProperties.propertyCount; i++)
+                    {
+                        if (getDocReply.docProperties.propertyNames[i] == "%VERSION_FILE_NAME") // Probably always at index [0], but can't guarantee for future versions
+                        {
+                            fileExtension = getDocReply.docProperties.propertyValues[i].ToString().Split('.')[1];
+                            break;
+                        }
+                    }
+                    fileName = fileName+ documentName + "." + fileExtension;
+                System.IO.File.WriteAllBytes(fileName, documentContent);
+
+                   
+                    return documentContent;
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+
+            private static void ChangeLockStatus(int documentNumber, string lockStatus)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    DocObjectCall docCall = new DocObjectCall();
+                    docCall.dstIn = _dst;
+                    docCall.objectType = "v_defprof";
+                    docCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 3,
+                        propertyNames = new string[3] { "%TARGET_LIBRARY", "%OBJECT_IDENTIFIER", "%STATUS" },
+                        propertyValues = new object[3] { _library, documentNumber, lockStatus }
+                    };
+                    dmSvcClient.UpdateObject(docCall);
+                    dmSvcClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static void LockDocument(int documentNumber)
+            {
+                ChangeLockStatus(documentNumber, "%LOCK");
+            }
+
+            public static void UnlockDocument(int documentNumber)
+            {
+                ChangeLockStatus(documentNumber, "%UNLOCK");
+            }
+
+            public static void SetTrustees(int documentNumber, Tuple<int[], string[], int[]> trustees)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    SecureObjectCall objectCall = new SecureObjectCall();
+                    objectCall.dstIn = _dst;
+                    objectCall.objectType = "v_defprof";
+                    objectCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 2,
+                        propertyNames = new string[] { "%TARGET_LIBRARY", "%OBJECT_IDENTIFIER" },
+                        propertyValues = new object[] { _library, documentNumber }
+                    };
+                    objectCall.trustees = new Trustees()
+                    {
+                        trusteeCount = 3,
+                        trusteeFlags = trustees.Item1, // Example: { 2, 2, 1 } - 1 for Group, 2 for User
+                        trusteeNames = trustees.Item2, // Example: { "dmuser1", "dmuser2", "DOCS_USERS" }
+                        trusteeRights = trustees.Item3 // Example: { 255, 255, 1 }
+                    };
+                    dmSvcClient.SetTrustees(objectCall);
+                    dmSvcClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+
+            #region Search
+            private static string[,] ExecuteSearch(SearchCallSvr3 searchCall)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    SearchReplySvr3 searchReply = dmSvcClient.SearchSvr3(searchCall);
+                    GetRowCountCall rowCountCall = new GetRowCountCall();
+                    rowCountCall.resultSetID = searchReply.resultSetID;
+                    GetRowCountReply rowCountReply = dmObjClient.GetRowCount(rowCountCall);
+                    string[,] searchResults = new string[0, 0];
+                    if (rowCountReply.rowCount > 0)
+                    {
+                        GetDataCall dataCall = new GetDataCall();
+                        dataCall.resultSetID = searchReply.resultSetID;
+                        dataCall.requestedRows = rowCountReply.rowCount;
+                        GetDataReply dataReply = dmObjClient.GetDataW(dataCall);
+                        ReleaseObjectCall releaseResultsCall = new ReleaseObjectCall();
+                        releaseResultsCall.objectID = searchReply.resultSetID;
+                        dmObjClient.ReleaseObject(releaseResultsCall);
+                        int byteIndex = sizeof(int) * 2;
+                        searchResults = new string[dataReply.resultSetData.actualRows + 1, dataReply.resultSetData.columns];
+                        for (int i = 0; i < dataReply.resultSetData.actualRows + 1; i++)
+                        {
+                            for (int j = 0; j < dataReply.resultSetData.columns; j++)
+                            {
+                                if (i == 0)
+                                    searchResults[i, j] = searchCall.signature.retProperties[j];
+                                else
+                                {
+                                    int sizeOfNextString = BitConverter.ToInt32(dataReply.resultSetData.resultBuffer, byteIndex) * 2;
+                                    byteIndex += sizeof(int);
+                                    searchResults[i, j] = Encoding.Unicode.GetString(dataReply.resultSetData.resultBuffer, byteIndex, sizeOfNextString);
+                                    byteIndex += sizeOfNextString + 2;
+                                }
+                            }
+                        }
+                    }
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                    return searchResults;
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static string[,] SearchLibrary(string profileForm, Dictionary<string, string> searchCriteria, string[] returnProperties)
+            {
+                SearchCriteria searchProperties = new SearchCriteria()
+                {
+                    criteriaCount = searchCriteria.Count,
+                    criteriaNames = new string[searchCriteria.Count],
+                    criteriaValues = new string[searchCriteria.Count]
+                };
+                int iter = 0;
+                foreach (var v in searchCriteria)
+                {
+                    searchProperties.criteriaNames[iter] = v.Key;
+                    searchProperties.criteriaValues[iter] = v.Value;
+                    iter++;
+                }
+                SearchCallSvr3 searchCall = new SearchCallSvr3();
+                searchCall.dstIn = _dst;
+                searchCall.objectType = profileForm;
+                searchCall.signature = new SearchSignatureSvr3()
+                {
+                    contexts = new SearchContexts()
+                    {
+                        contextCount = 1,
+                        contextNames = new string[1] { _library },
+                        contextTypes = new int[1] { 0 }
+                    },
+                    criteria = searchProperties,
+                    sortProps = new SortProperties()
+                    {
+                        propertyCount = 1,
+                        propertyNames = new string[1] { returnProperties[0] },
+                        propertyFlags = new int[1] { 2 } // 1 for ascending order, 2 for descending order.
+                    },
+                    options = new SearchOptions()
+                    {
+                        optionCount = 0,
+                        optionValues = new object[0],
+                        optionTypes = new int[0]
+                    },
+                    retProperties = returnProperties,
+                    retMetaProperties = new string[0]
+                };
+                return ExecuteSearch(searchCall);
+            }
+
+            public static string[,] GetRecentlyEditedDocuments(string userID)
+            {
+                SearchCallSvr3 searchCall = new SearchCallSvr3();
+                searchCall.dstIn = _dst;
+                searchCall.objectType = "v_defprof";
+                searchCall.signature = new SearchSignatureSvr3()
+                {
+                    contexts = new SearchContexts()
+                    {
+                        contextCount = 1,
+                        contextNames = new string[1] { _library },
+                        contextTypes = new int[1] { 0 }
+                    },
+                    criteria = new SearchCriteria()
+                    {
+                        criteriaCount = 1,
+                        criteriaNames = new string[2] { "%RECENTDOCS", "%MAXDAYS" },
+                        criteriaValues = new string[2] { userID, "90" }
+                    },
+                    sortProps = new SortProperties()
+                    {
+                        propertyCount = 1,
+                        propertyNames = new string[1] { "%RECENTACTIVITYDATE" },
+                        propertyFlags = new int[1] { 2 } // 1 for ascending order, 2 for descending order.
+                    },
+                    options = new SearchOptions()
+                    {
+                        optionCount = 0,
+                        optionValues = new object[0],
+                        optionTypes = new int[0]
+                    },
+                    retProperties = new string[] { "DOCNUM", "DOCNAME", "AUTHOR_ID", "TYPIST_ID", "TYPE_ID", "APP_ID", "%RECENTACTIVITYDATE" },
+                    retMetaProperties = new string[0]
+                };
+                return ExecuteSearch(searchCall);
+            }
+
+            public static string[,] GetDocumentVersions(int documentNumber)
+            {
+                SearchCallSvr3 searchCall = new SearchCallSvr3();
+                searchCall.dstIn = _dst;
+                searchCall.objectType = "VersionsSearch";
+                searchCall.signature = new SearchSignatureSvr3()
+                {
+                    contexts = new SearchContexts()
+                    {
+                        contextCount = 1,
+                        contextNames = new string[1] { _library },
+                        contextTypes = new int[1] { 0 }
+                    },
+                    criteria = new SearchCriteria()
+                    {
+                        criteriaCount = 1,
+                        criteriaNames = new string[1] { "%OBJECT_IDENTIFIER" },
+                        criteriaValues = new string[1] { documentNumber.ToString() }
+                    },
+                    sortProps = new SortProperties()
+                    {
+                        propertyCount = 1,
+                        propertyNames = new string[1] { "VERSION_LABEL" },
+                        propertyFlags = new int[1] { 2 } // 1 for ascending order, 2 for descending order.
+                    },
+                    options = new SearchOptions()
+                    {
+                        optionCount = 0,
+                        optionValues = new object[0],
+                        optionTypes = new int[0]
+                    },
+                    retProperties = new string[] { "VERSION_ID", "VERSION_LABEL", "COMMENTS", "FILE_EXTENSION" },
+                    retMetaProperties = new string[0]
+                };
+                return ExecuteSearch(searchCall);
+            }
+            #endregion
+
+            public static string[,] GetFolderContents(int folderDocumentNumber)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    SecureObjectCall objectCall = new SecureObjectCall();
+                    objectCall.dstIn = _dst;
+                    objectCall.objectType = "ContentsCollection";
+                    objectCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 3,
+                        propertyNames = new string[3] { "%TARGET_LIBRARY", "PARENT", "PARENT_VERSION" },
+                        propertyValues = new object[3] { _library, folderDocumentNumber, 1 }
+                    };
+                    DocObjectReply docReply = dmSvcClient.CreateObject(objectCall);
+                    string collectionID = docReply.retProperties.propertyValues[Array.IndexOf(docReply.retProperties.propertyNames, "%IUNKNOWN_INTERFACE")].ToString();
+                    NewEnumCall newEnumCall = new NewEnumCall();
+                    newEnumCall.dstIn = _dst;
+                    newEnumCall.collectionID = collectionID;
+                    NewEnumReply newEnumReply = dmObjClient.NewEnum(newEnumCall);
+                    ReleaseObjectCall releaseCollectionCall = new ReleaseObjectCall();
+                    releaseCollectionCall.objectID = collectionID;
+                    dmObjClient.ReleaseObject(releaseCollectionCall);
+                    List<string[]> folderContents = new List<string[]>();
+                    const int ROW_FETCH_LIMIT = 20;
+                    while (true)
+                    {
+                        NextDataCall nextDataCall = new NextDataCall();
+                        nextDataCall.dstIn = _dst;
+                        nextDataCall.enumID = newEnumReply.enumID;
+                        nextDataCall.elementCount = ROW_FETCH_LIMIT;
+                        NextDataReply nextDataReply = dmObjClient.NextData(nextDataCall);
+                        if (folderContents.Count == 0)
+                            folderContents.Add(new string[4] { "DOCNUMBER", "VERSION", "DISPLAYNAME", "%DOCS_LIBRARY_NAME" }); // Specify your return properties here...
+                        foreach (var folderItem in nextDataReply.genericItemsData.propertyRows)
+                            folderContents.Add(new string[4]
+                            { // ...and here, in the same order as above
+                            folderItem[Array.IndexOf(nextDataReply.genericItemsData.propertyNames, "DOCNUMBER")].ToString(),
+                            folderItem[Array.IndexOf(nextDataReply.genericItemsData.propertyNames, "VERSION")].ToString(), // Version ID of document
+                            folderItem[Array.IndexOf(nextDataReply.genericItemsData.propertyNames, "DISPLAYNAME")].ToString(), // Name of document within folder
+                            folderItem[Array.IndexOf(nextDataReply.genericItemsData.propertyNames, "%DOCS_LIBRARY_NAME")].ToString() // Library document is within
+                            });
+                        if (nextDataReply.genericItemsData.itemCount != ROW_FETCH_LIMIT)
+                            break;
+                    }
+                    ReleaseObjectCall releaseEnumCall = new ReleaseObjectCall();
+                    releaseEnumCall.objectID = newEnumReply.enumID;
+                    dmObjClient.ReleaseObject(releaseEnumCall);
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                    string[,] results = new string[folderContents.Count, folderContents[0].Length];
+                    for (int i = 0; i < folderContents.Count; i++)
+                        for (int j = 0; j < folderContents[0].Length; j++)
+                            results[i, j] = folderContents[i][j];
+                    return results;
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static string[,] DatabaseQuery(string sql)
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                DMObjClient dmObjClient = ClientCreate(false);
+                try
+                {
+                    SQLServiceCall sqlCall = new SQLServiceCall();
+                    sqlCall.dstIn = _dst;
+                    sqlCall.libraryName = _library;
+                    sqlCall.sql = sql;
+                    SQLServiceReply sqlReply = dmSvcClient.SQLService(sqlCall);
+                    GetRowCountCall rowCountCall = new GetRowCountCall();
+                    rowCountCall.resultSetID = sqlReply.resultSetID;
+                    GetRowCountReply rowCountReply = dmObjClient.GetRowCount(rowCountCall);
+                    GetDataCall dataCall = new GetDataCall();
+                    dataCall.resultSetID = sqlReply.resultSetID;
+                    dataCall.requestedRows = rowCountReply.rowCount;
+                    GetDataReply dataReply = dmObjClient.GetDataW(dataCall);
+                    ReleaseObjectCall releaseResultsCall = new ReleaseObjectCall();
+                    releaseResultsCall.objectID = sqlReply.resultSetID;
+                    dmObjClient.ReleaseObject(releaseResultsCall);
+                    int byteIndex = sizeof(int) * 2;
+                    string[,] sqlResults = new string[dataReply.resultSetData.actualRows, dataReply.resultSetData.columns];
+                    for (int i = 0; i < dataReply.resultSetData.actualRows; i++)
+                    {
+                        for (int j = 0; j < dataReply.resultSetData.columns; j++)
+                        {
+                            int sizeOfNextString = BitConverter.ToInt32(dataReply.resultSetData.resultBuffer, byteIndex) * 2;
+                            byteIndex += sizeof(int);
+                            sqlResults[i, j] = Encoding.Unicode.GetString(dataReply.resultSetData.resultBuffer, byteIndex, sizeOfNextString);
+                            byteIndex += sizeOfNextString + 2;
+                        }
+                    }
+                    dmSvcClient.Close();
+                    dmObjClient.Close();
+                    return sqlResults;
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    dmObjClient.Abort();
+                    throw ex;
+                }
+            }
+
+            public static void RefreshServerCache()
+            {
+                DMSvcClient dmSvcClient = ClientCreate(true);
+                try
+                {
+                    DocObjectCall docCall = new DocObjectCall();
+                    docCall.dstIn = _dst;
+                    docCall.objectType = "CacheManager";
+                    docCall.properties = new NamedProperties()
+                    {
+                        propertyCount = 2,
+                        propertyNames = new string[2] { "%SERVER_NAME", "%CACHE_DIRECTIVE" },
+                        propertyValues = new object[2] { _server, "%CACHE_REFRESH" }
+                    };
+                    dmSvcClient.UpdateObject(docCall);
+                    dmSvcClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    dmSvcClient.Abort();
+                    throw ex;
+                }
+            }
+        }
+
+   
+    }
